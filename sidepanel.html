@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Gesture Nav</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --night:#0e0c1f; --mist:#f3f0ff; --line:rgba(243,240,255,0.14);
+    --coral:#ff8b7b; --mint:#7be6c4; --peri:#8fa6ff; --gold:#ffd37b; --red:#ff5566;
+  }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; padding:0; width:100%; height:100%; background:var(--night); color:var(--mist);
+    font-family:'Baloo 2', sans-serif; overflow-x:hidden; }
+  .mono{ font-family:'JetBrains Mono', monospace; }
+
+  #wrap{ display:flex; flex-direction:column; height:100vh; }
+
+  header{ padding:14px 16px 10px; text-align:center; border-bottom:1px solid var(--line); }
+  header .name{ font-size:16px; font-weight:700; letter-spacing:0.1em; }
+  header .sub{ font-size:10px; opacity:0.5; letter-spacing:0.08em; margin-top:2px; font-family:'JetBrains Mono'; }
+
+  #camWrap{ position:relative; width:100%; aspect-ratio:4/3; background:#0a091c; border-bottom:1px solid var(--line); overflow:hidden; }
+  video#cam{ width:100%; height:100%; object-fit:cover; transform:scaleX(-1); filter:grayscale(0.25) brightness(0.85);
+    opacity:0; transition:opacity 0.2s; }
+  video#cam.show{ opacity:1; }
+  #previewToggle{ position:absolute; bottom:6px; right:6px; z-index:5; font-family:'JetBrains Mono'; font-size:10px;
+    background:rgba(10,9,26,0.6); border:1px solid var(--line); color:var(--mist); padding:4px 8px; border-radius:10px;
+    cursor:pointer; }
+  #previewToggle.hidden{ display:none; }
+  svg#handLayer{ position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
+  .handGroup{ opacity:0; filter:drop-shadow(0 0 5px var(--hc,#fff)); }
+  .finger{ fill:none; stroke:var(--hc,#fff); stroke-width:10; stroke-linecap:round; stroke-linejoin:round; opacity:0.92; }
+  .palm{ fill:var(--hc,#fff); opacity:0.28; }
+  .tip{ fill:var(--hc,#fff); opacity:0.95; }
+
+  #statusRow{ display:flex; gap:8px; padding:10px 14px; border-bottom:1px solid var(--line); flex-wrap:wrap; }
+  .handChip{ display:flex; align-items:center; gap:6px; font-size:11px; font-weight:600;
+    background:rgba(243,240,255,0.06); border:1px solid var(--line); border-radius:12px; padding:4px 9px;
+    opacity:0.35; transition:opacity 0.2s; }
+  .handChip.on{ opacity:1; }
+  .dot{ width:7px; height:7px; border-radius:50%; box-shadow:0 0 6px currentColor; }
+  .handChip .g{ font-family:'JetBrains Mono'; font-size:10px; opacity:0.85; }
+
+  #infoRow{ display:flex; justify-content:space-between; padding:8px 14px; font-size:11px; opacity:0.6; font-family:'JetBrains Mono'; border-bottom:1px solid var(--line); }
+
+  #micIndicator{ margin:8px 14px 0; text-align:center; font-family:'JetBrains Mono'; font-size:11px;
+    background:rgba(255,85,102,0.15); border:1px solid rgba(255,85,102,0.5); color:#ff8a94;
+    padding:6px; border-radius:10px; opacity:0; transition:opacity 0.2s; }
+  #micIndicator.show{ opacity:1; }
+
+  #toast{ margin:8px 14px 0; text-align:center; font-size:12px; font-weight:600;
+    background:rgba(243,240,255,0.07); border:1px solid var(--line); border-radius:10px; padding:6px;
+    opacity:0; transition:opacity 0.2s; }
+  #toast.show{ opacity:1; }
+
+  #legend{ flex:1; overflow-y:auto; padding:10px 14px 16px; }
+  #legend h2{ font-size:11px; letter-spacing:0.08em; opacity:0.5; margin:10px 0 6px; font-weight:700; }
+  .legendRow{ display:flex; justify-content:space-between; align-items:center; font-size:12.5px;
+    padding:6px 0; border-bottom:1px solid rgba(243,240,255,0.06); }
+  .legendRow .g{ font-weight:700; }
+  .legendRow .a{ opacity:0.65; font-size:11.5px; text-align:right; }
+
+  .overlay{ position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    background:radial-gradient(circle at 50% 30%, #201a4a 0%, #0a091c 75%); z-index:10; padding:24px; text-align:center; }
+  .overlay.hidden{ display:none; }
+  .badge{ font-size:10px; letter-spacing:0.16em; color:var(--mint); border:1px solid rgba(123,230,196,0.4);
+    padding:4px 12px; border-radius:16px; margin-bottom:16px; font-weight:600; }
+  h1{ font-size:26px; margin:0 0 8px; font-weight:700; }
+  h1 span{ color:var(--peri); }
+  .desc{ font-size:13px; opacity:0.7; max-width:260px; margin:0 0 20px; line-height:1.4; }
+  button.cta{ font-family:'Baloo 2'; font-weight:700; font-size:15px; background:var(--mint); color:#0a2b22;
+    border:none; padding:11px 26px; border-radius:9px; cursor:pointer; box-shadow:0 5px 0 #3f9c7f; }
+  button.cta:active{ transform:translateY(3px); box-shadow:0 2px 0 #3f9c7f; }
+  #status{ margin-top:12px; font-size:12px; opacity:0.6; max-width:260px; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <header><div class="name">GESTURE NAV</div><div class="sub">HANDS-FREE BROWSING</div></header>
+
+  <div id="camWrap">
+    <video id="cam" autoplay playsinline muted></video>
+    <button id="previewToggle" class="hidden">Show preview</button>
+    <svg id="handLayer">
+      <g id="handLeft" class="handGroup">
+        <path class="palm"></path>
+        <path class="finger finger-thumb"></path><path class="finger finger-index"></path>
+        <path class="finger finger-middle"></path><path class="finger finger-ring"></path><path class="finger finger-pinky"></path>
+        <circle class="tip" r="5"></circle><circle class="tip" r="5"></circle><circle class="tip" r="5"></circle>
+        <circle class="tip" r="5"></circle><circle class="tip" r="5"></circle>
+      </g>
+      <g id="handRight" class="handGroup">
+        <path class="palm"></path>
+        <path class="finger finger-thumb"></path><path class="finger finger-index"></path>
+        <path class="finger finger-middle"></path><path class="finger finger-ring"></path><path class="finger finger-pinky"></path>
+        <circle class="tip" r="5"></circle><circle class="tip" r="5"></circle><circle class="tip" r="5"></circle>
+        <circle class="tip" r="5"></circle><circle class="tip" r="5"></circle>
+      </g>
+    </svg>
+
+    <div class="overlay" id="startScreen">
+      <div class="badge">HAND-TRACKED · ON-DEVICE</div>
+      <h1>GESTURE<br><span>NAV</span></h1>
+      <p class="desc">Scroll, go back/forward, zoom, and switch tabs with your hands — or your voice.</p>
+      <button class="cta" id="startBtn">Enable Camera</button>
+      <div id="status"></div>
+    </div>
+  </div>
+
+  <div id="statusRow">
+    <div class="handChip" id="chipLeft"><span class="dot"></span><span>L</span><span class="g">—</span></div>
+    <div class="handChip" id="chipRight"><span class="dot"></span><span>R</span><span class="g">—</span></div>
+  </div>
+  <div id="infoRow"><span id="zoomInfo">ZOOM 100%</span><span id="fpsInfo">FPS 0</span></div>
+  <div id="micIndicator">🎤 Listening…</div>
+  <div id="toast"></div>
+
+  <div id="legend">
+    <h2>GESTURES</h2>
+    <div class="legendRow"><span class="g" style="color:var(--peri)">🤏 Pinch + move</span><span class="a">Scroll</span></div>
+    <div class="legendRow"><span class="g" style="color:var(--mint)">🤏🤏 Two-hand pinch</span><span class="a">Zoom in/out</span></div>
+    <div class="legendRow"><span class="g" style="color:#dfe4ea">✋ Swipe left/right</span><span class="a">Back / Forward</span></div>
+    <div class="legendRow"><span class="g" style="color:var(--gold)">☝️ Index finger only</span><span class="a">Move cursor</span></div>
+    <div class="legendRow"><span class="g" style="color:var(--peri)">✌️ Peace, after pointing</span><span class="a">Click</span></div>
+    <div class="legendRow"><span class="g" style="color:var(--mint)">👍 Hold</span><span class="a">Next tab</span></div>
+    <div class="legendRow"><span class="g" style="color:#dfe4ea">👎 Hold</span><span class="a">Previous tab</span></div>
+    <div class="legendRow"><span class="g" style="color:var(--coral)">🤙 Hold</span><span class="a">Start voice</span></div>
+
+    <h2>VOICE COMMANDS</h2>
+    <div class="legendRow"><span class="g">"back" / "forward"</span><span class="a">Navigate</span></div>
+    <div class="legendRow"><span class="g">"new tab" / "close tab"</span><span class="a">Tabs</span></div>
+    <div class="legendRow"><span class="g">"next tab" / "previous tab"</span><span class="a">Switch</span></div>
+    <div class="legendRow"><span class="g">"refresh"</span><span class="a">Reload</span></div>
+    <div class="legendRow"><span class="g">"zoom in" / "zoom out"</span><span class="a">Zoom</span></div>
+    <div class="legendRow"><span class="g">"reset zoom"</span><span class="a">Back to 100%</span></div>
+    <div class="legendRow"><span class="g">"scroll up" / "scroll down"</span><span class="a">Scroll</span></div>
+    <div class="legendRow"><span class="g">"top" / "bottom"</span><span class="a">Jump to top/bottom</span></div>
+    <div class="legendRow"><span class="g">"go to ___"</span><span class="a">Open a site</span></div>
+    <div class="legendRow"><span class="g">"search for ___"</span><span class="a">Google search</span></div>
+  </div>
+</div>
+
+<script type="module" src="sidepanel.js"></script>
+</body>
+</html>
